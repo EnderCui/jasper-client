@@ -14,6 +14,7 @@ from client import stt
 from client import jasperpath
 from client import diagnose
 from client.conversation import Conversation
+from client.slackBot import Slackbot
 
 # Add jasperpath.LIB_PATH to sys.path
 sys.path.append(jasperpath.LIB_PATH)
@@ -53,33 +54,15 @@ class Jasper(object):
                                   "won't work correctly.",
                                   jasperpath.CONFIG_PATH)
 
-        # FIXME: For backwards compatibility, move old config file to newly
-        #        created config dir
-        old_configfile = os.path.join(jasperpath.LIB_PATH, 'profile.yml')
-        new_configfile = jasperpath.config('profile.yml')
-        if os.path.exists(old_configfile):
-            if os.path.exists(new_configfile):
-                self._logger.warning("Deprecated profile file found: '%s'. " +
-                                     "Please remove it.", old_configfile)
-            else:
-                self._logger.warning("Deprecated profile file found: '%s'. " +
-                                     "Trying to copy it to new location '%s'.",
-                                     old_configfile, new_configfile)
-                try:
-                    shutil.copy2(old_configfile, new_configfile)
-                except shutil.Error:
-                    self._logger.error("Unable to copy config file. " +
-                                       "Please copy it manually.",
-                                       exc_info=True)
-                    raise
+        configfile = jasperpath.config('profile.yml')
 
         # Read config
-        self._logger.debug("Trying to read config file: '%s'", new_configfile)
+        self._logger.debug("Trying to read config file: '%s'", configfile)
         try:
-            with open(new_configfile, "r") as f:
+            with open(configfile, "r") as f:
                 self.config = yaml.safe_load(f)
         except OSError:
-            self._logger.error("Can't open config file: '%s'", new_configfile)
+            self._logger.error("Can't open config file: '%s'", configfile)
             raise
 
         try:
@@ -115,7 +98,15 @@ class Jasper(object):
                           % self.config["first_name"])
         else:
             salutation = "How can I be of service?"
-        self.mic.say(salutation)
+        #self.mic.say(salutation)
+
+        if 'slackbot' in self.config:
+            if 'slackbot_webhook_url' in self.config["slackbot"]:
+                self.bot = Slackbot(self.config["slackbot"]["slackbot_webhook_url"])
+                self.bot.sendMessage("How can I be of service?")
+            else:
+                self.bot = Slackbot("")
+        self.bot.startBot()
 
         conversation = Conversation("JASPER", self.mic, self.config)
         conversation.handleForever()
