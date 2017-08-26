@@ -1,172 +1,111 @@
 # -*- coding: utf-8-*-
-import re
-import datetime
-import struct
-import urllib
-import feedparser
+# 天气插件
+import logging
 import requests
-import bs4
-from client.app_utils import getTimezone
-from semantic.dates import DateService
+import json
+import sys
 
-WORDS = ["WEATHER", "TODAY", "TOMORROW"]
+reload(sys)
+sys.setdefaultencoding('utf8')
 
+# Standard module stuff
+WORDS = ["TIANQI"]
+SLUG = "weather"
 
-def replaceAcronyms(text):
-    """
-    Replaces some commonly-used acronyms for an improved verbal weather report.
-    """
-
-    def parseDirections(text):
-        words = {
-            'N': 'north',
-            'S': 'south',
-            'E': 'east',
-            'W': 'west',
-        }
-        output = [words[w] for w in list(text)]
-        return ' '.join(output)
-    acronyms = re.findall(r'\b([NESW]+)\b', text)
-
-    for w in acronyms:
-        text = text.replace(w, parseDirections(w))
-
-    text = re.sub(r'(\b\d+)F(\b)', '\g<1> Fahrenheit\g<2>', text)
-    text = re.sub(r'(\b)mph(\b)', '\g<1>miles per hour\g<2>', text)
-    text = re.sub(r'(\b)in\.', '\g<1>inches', text)
-
-    return text
-
-
-def get_locations():
-    r = requests.get('http://www.wunderground.com/about/faq/' +
-                     'international_cities.asp')
-    soup = bs4.BeautifulSoup(r.text)
-    data = soup.find(id="inner-content").find('pre').string
-    # Data Stucture:
-    #  00 25 location
-    #  01  1
-    #  02  2 region
-    #  03  1
-    #  04  2 country
-    #  05  2
-    #  06  4 ID
-    #  07  5
-    #  08  7 latitude
-    #  09  1
-    #  10  7 logitude
-    #  11  1
-    #  12  5 elevation
-    #  13  5 wmo_id
-    s = struct.Struct("25s1s2s1s2s2s4s5s7s1s7s1s5s5s")
-    for line in data.splitlines()[3:]:
-        row = s.unpack_from(line)
-        info = {'name': row[0].strip(),
-                'region': row[2].strip(),
-                'country': row[4].strip(),
-                'latitude': float(row[8].strip()),
-                'logitude': float(row[10].strip()),
-                'elevation': int(row[12].strip()),
-                'id': row[6].strip(),
-                'wmo_id': row[13].strip()}
-        yield info
-
-
-def get_forecast_by_name(location_name):
-    entries = feedparser.parse("http://rss.wunderground.com/auto/rss_full/%s"
-                               % urllib.quote(location_name))['entries']
-    if entries:
-        # We found weather data the easy way
-        return entries
+def analyze_today(weather_code, suggestion):
+    """ analyze today's weather """
+    weather_code = int(weather_code)
+    if weather_code <= 8:
+        if u'适宜' in suggestion:
+            return u'今天天气不错，空气清新，适合出门运动哦'
+        else:
+            return u'空气质量比较一般，建议减少出行'
+    elif weather_code in range(10, 16):
+        return u'主人，出门记得带伞哦'
+    elif weather_code in range(16, 19) or \
+    weather_code in range(25, 30) or \
+    weather_code in range(34, 37):
+        return u'极端天气来临，尽量待屋里陪我玩吧'
+    elif weather_code == 38:
+        return u'天气炎热，记得多补充水分哦'
+    elif weather_code == 37:
+        return u'好冷的天，记得穿厚一点哦'
     else:
-        # We try to get weather data via the list of stations
-        for location in get_locations():
-            if location['name'] == location_name:
-                return get_forecast_by_wmo_id(location['wmo_id'])
+        return u''
 
 
-def get_forecast_by_wmo_id(wmo_id):
-    return feedparser.parse("http://rss.wunderground.com/auto/" +
-                            "rss_full/global/stations/%s.xml"
-                            % wmo_id)['entries']
+def fetch_weather(api, key, location):
+    result = requests.get(api, params={
+        'key': key,
+        'location': location
+    }, timeout=3)
+    res = json.loads(result.text, encoding='utf-8')
+    return res
 
 
-def handle(text, mic, profile):
+def handle(text, mic, profile, wxbot=None):
     """
-    Responds to user-input, typically speech text, with a summary of
-    the relevant weather for the requested date (typically, weather
-    information will not be available for days beyond tomorrow).
+    Responds to user-input, typically speech text
 
     Arguments:
         text -- user-input, typically transcribed speech
         mic -- used to interact with the user (for both input and output)
         profile -- contains information related to the user (e.g., phone
                    number)
+        wxbot -- wechat bot instance
     """
-    forecast = None
-    if 'wmo_id' in profile:
-        forecast = get_forecast_by_wmo_id(str(profile['wmo_id']))
-    elif 'location' in profile:
-        forecast = get_forecast_by_name(str(profile['location']))
-
-    if not forecast:
-        mic.say("I'm sorry, I can't seem to access that information. Please " +
-                "make sure that you've set your location on the dashboard.")
+    logger = logging.getLogger(__name__)
+    # get config
+    if SLUG not in profile or \
+       'key' not in profile[SLUG] or \
+       (
+           'location' not in profile[SLUG] and
+           'location' not in profile
+       ):
+        mic.say('天气插件配置有误，插件使用失败')
         return
-
-    tz = getTimezone(profile)
-
-    service = DateService(tz=tz)
-    date = service.extractDay(text)
-    if not date:
-        date = datetime.datetime.now(tz=tz)
-    weekday = service.__daysOfWeek__[date.weekday()]
-
-    if date.weekday() == datetime.datetime.now(tz=tz).weekday():
-        date_keyword = "Today"
-    elif date.weekday() == (
-            datetime.datetime.now(tz=tz).weekday() + 1) % 7:
-        date_keyword = "Tomorrow"
+    key = profile[SLUG]['key']
+    if 'location' in profile[SLUG]:
+        location = profile[SLUG]['location']
     else:
-        date_keyword = "On " + weekday
-
-    output = None
-
-    for entry in forecast:
-        try:
-            date_desc = entry['title'].split()[0].strip().lower()
-            if date_desc == 'forecast':
-                # For global forecasts
-                date_desc = entry['title'].split()[2].strip().lower()
-                weather_desc = entry['summary']
-            elif date_desc == 'current':
-                # For first item of global forecasts
-                continue
-            else:
-                # US forecasts
-                weather_desc = entry['summary'].split('-')[1]
-
-            if weekday == date_desc:
-                output = date_keyword + \
-                    ", the weather will be " + weather_desc + "."
-                break
-        except:
-            continue
-
-    if output:
-        output = replaceAcronyms(output)
-        mic.say(output)
-    else:
-        mic.say(
-            "I'm sorry. I can't see that far ahead.")
-
-
+        location = profile['location']
+    WEATHER_API = 'https://api.seniverse.com/v3/weather/daily.json'        
+    SUGGESTION_API = 'https://api.seniverse.com/v3/life/suggestion.json'
+    try:
+        weather = fetch_weather(WEATHER_API, key, location)
+        logger.debug("Weather report: ", weather)
+        if weather.has_key('results'):
+            daily = weather['results'][0]['daily']
+            days = set([])
+            day_text = [u'今天', u'明天', u'后天']
+            for word in day_text:
+                if word in text:
+                    days.add(day_text.index(word))
+            if not any(word in text for word in day_text):
+                days = set([0, 1, 2])
+            responds = u'%s天气：' % location
+            analyze_res = ''
+            for day in days:
+                responds += u'%s：%s，%s到%s摄氏度。' % (day_text[day], daily[day]['text_day'], daily[day]['low'], daily[day]['high'])
+                if day == 0:
+                    suggestion = fetch_weather(SUGGESTION_API, key, location)
+                    if suggestion.has_key('results'):
+                        suggestion_text = suggestion['results'][0]['suggestion']['sport']['brief']
+                        analyze_res = analyze_today(daily[day]['code_day'], suggestion_text)
+            responds += analyze_res
+            mic.say(responds)
+        else:
+            mic.say('抱歉，我获取不到天气数据，请稍后再试')
+    except Exception, e:
+        logger.error(e)
+        mic.say('抱歉，我获取不到天气数据，请稍后再试')
+        
+    
 def isValid(text):
     """
-        Returns True if the text is related to the weather.
+        Returns True if the input is related to weather.
 
         Arguments:
         text -- user-input, typically transcribed speech
     """
-    return bool(re.search(r'\b(weathers?|temperature|forecast|outside|hot|' +
-                          r'cold|jacket|coat|rain)\b', text, re.IGNORECASE))
+    return any(word in text for word in [u"天气", u"气温"])
