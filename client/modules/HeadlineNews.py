@@ -12,7 +12,7 @@ sys.setdefaultencoding('utf8')
 WORDS = ["TOUTIAOXINWEN"]
 SLUG = "headline_news"
 
-def request(appkey, mic, logger, m="GET"):
+def request(appkey, mic, logger, bot, m="GET"):
     url = "http://v.juhe.cn/toutiao/index"
     params = {
         "key" : appkey,
@@ -34,14 +34,14 @@ def request(appkey, mic, logger, m="GET"):
             news_for_tts = ""
             for new in news:
                 news_for_tts = news_for_tts + new["title"] + "."
+            if bot is not None:
+                bot.sendMessage(news)
             mic.say(news_for_tts)
-            return news_for_tts
         else:
             logger.error(str(error_code) + ':' + res["reason"])
             mic.say(res["reason"])
     else:
         mic.say(u"新闻头条接口调用错误")
-    return "新闻获取失败"
 
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
@@ -51,9 +51,7 @@ def handle(text, mic, profile, bot=None):
         mic.say(u"新闻头条插件配置有误，插件使用失败")
         return
     key = profile[SLUG]['key']
-    news = request(key, mic, logger)
-    if bot is not None:
-        bot.sendMessage(news)
+    request(key, mic, logger, bot)
 
 def isValid(text):
     return any(word in text for word in [u"新闻头条", u"头条新闻", u"头条"])

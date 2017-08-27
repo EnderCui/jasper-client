@@ -3,7 +3,6 @@
     The Mic class handles all interactions with the microphone and speaker.
 """
 import ctypes
-import mute_alsa
 import logging
 import tempfile
 import wave
@@ -12,12 +11,14 @@ import pyaudio
 import alteration
 import jasperpath
 
+ERROR_HANDLER_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int,
+                                      ctypes.c_char_p, ctypes.c_int,
+                                      ctypes.c_char_p)
+def py_error_handler(filename, line, function, err, fmt):
+    pass
+c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
 class Mic:
-
-    speechRec = None
-    speechRec_persona = None
-
     def __init__(self, speaker, passive_stt_engine, active_stt_engine):
         """
         Initiates the pocketsphinx instance.
@@ -37,7 +38,7 @@ class Mic:
                           "can usually be safely ignored.")
         try:
             asound = ctypes.cdll.LoadLibrary('libasound.so.2')
-            asound.snd_lib_error_set_handler(mute_alsa.c_error_handler)
+            asound.snd_lib_error_set_handler(c_error_handler)
         except OSError:
             pass
         self._audio = pyaudio.PyAudio()
