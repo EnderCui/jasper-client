@@ -380,7 +380,7 @@ class SnowboySTT(AbstractSTTEngine):
         self.sensitivity = sensitivity
         self.hotword = hotword
         self.model = model
-        self.resource_file = os.path.join(dingdangpath.LIB_PATH,
+        self.resource_file = os.path.join(jasperpath.LIB_PATH,
                                           'snowboy/common.res')
         try:
             from snowboy import snowboydetect
@@ -401,7 +401,7 @@ class SnowboySTT(AbstractSTTEngine):
         # FIXME: Replace this as soon as we have a config module
         config = {}
         # Try to get snowboy config from config
-        profile_path = dingdangpath.config('profile.yml')
+        profile_path = jasperpath.config('profile.yml')
         if os.path.exists(profile_path):
             with open(profile_path, 'r') as f:
                 profile = yaml.safe_load(f)
