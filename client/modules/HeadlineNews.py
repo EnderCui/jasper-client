@@ -35,7 +35,7 @@ def request(appkey, mic, logger, bot, m="GET"):
             for new in news:
                 news_for_tts = news_for_tts + new["title"] + "."
             if bot is not None:
-                bot.sendMessage(news)
+                bot.sendMessage(news_for_tts)
             mic.say(news_for_tts)
         else:
             logger.error(str(error_code) + ':' + res["reason"])
