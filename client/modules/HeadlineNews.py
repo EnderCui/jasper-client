@@ -35,14 +35,15 @@ def request(appkey, mic, logger, m="GET"):
             for new in news:
                 news_for_tts = news_for_tts + new["title"] + "."
             mic.say(news_for_tts)
+            return news_for_tts
         else:
             logger.error(str(error_code) + ':' + res["reason"])
             mic.say(res["reason"])
     else:
         mic.say(u"新闻头条接口调用错误")
+    return "新闻获取失败"
 
-
-def handle(text, mic, profile, wxbot=None):
+def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
 
     if SLUG not in profile or \
@@ -50,7 +51,9 @@ def handle(text, mic, profile, wxbot=None):
         mic.say(u"新闻头条插件配置有误，插件使用失败")
         return
     key = profile[SLUG]['key']
-    request(key, mic, logger)
+    news = request(key, mic, logger)
+    if bot not None:
+        bot.sendMessage(news)
 
 def isValid(text):
     return any(word in text for word in [u"新闻头条", u"头条新闻", u"头条"])

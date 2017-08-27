@@ -33,7 +33,6 @@ def analyze_today(weather_code, suggestion):
     else:
         return u''
 
-
 def fetch_weather(api, key, location):
     result = requests.get(api, params={
         'key': key,
@@ -42,18 +41,7 @@ def fetch_weather(api, key, location):
     res = json.loads(result.text, encoding='utf-8')
     return res
 
-
-def handle(text, mic, profile, wxbot=None):
-    """
-    Responds to user-input, typically speech text
-
-    Arguments:
-        text -- user-input, typically transcribed speech
-        mic -- used to interact with the user (for both input and output)
-        profile -- contains information related to the user (e.g., phone
-                   number)
-        wxbot -- wechat bot instance
-    """
+def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
     # get config
     if SLUG not in profile or \
@@ -99,8 +87,7 @@ def handle(text, mic, profile, wxbot=None):
     except Exception, e:
         logger.error(e)
         mic.say('抱歉，我获取不到天气数据，请稍后再试')
-        
-    
+
 def isValid(text):
     """
         Returns True if the input is related to weather.

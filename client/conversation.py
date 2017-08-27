@@ -6,11 +6,12 @@ from brain import Brain
 
 class Conversation(object):
 
-    def __init__(self, persona, mic, profile):
+    def __init__(self, persona, mic, profile, bot):
         self._logger = logging.getLogger(__name__)
         self.persona = persona
         self.mic = mic
         self.profile = profile
+        self.bot = bot
         self.brain = Brain(mic, profile)
         self.notifier = Notifier(profile)
 
@@ -44,6 +45,6 @@ class Conversation(object):
                                threshold)
 
             if input:
-                self.brain.query(input)
+                self.brain.query(input, self.bot)
             else:
                 self.mic.say("Pardon?")

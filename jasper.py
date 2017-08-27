@@ -102,11 +102,10 @@ class Jasper(object):
 
         if 'slackbot' in self.config:
             if 'slackbot_webhook_url' in self.config["slackbot"]:
-                self.bot = Slackbot(self.config["slackbot"]["slackbot_webhook_url"])
-                self.bot.sendMessage("How can I be of service?")
+                bot = Slackbot(self.config["slackbot"]["slackbot_webhook_url"])
             else:
-                self.bot = Slackbot("")
-        self.bot.startBot()
+                bot = Slackbot()
+        bot.startBot()
 
         if 'robot_name' in self.config:
             persona = self.config["robot_name"]
@@ -114,7 +113,7 @@ class Jasper(object):
             self.mic.say("Please set robot name")
             return
 
-        conversation = Conversation(persona, self.mic, self.config)
+        conversation = Conversation(persona, self.mic, self.config, bot)
         conversation.handleForever()
 
 if __name__ == "__main__":

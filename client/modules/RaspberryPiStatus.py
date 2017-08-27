@@ -55,7 +55,7 @@ def getPiStatus(logger, mic):
     result['disk_percentage'] = disk_stats[3].split('%')[0]
     return result
 
-def handle(text, mic, profile, wxbot=None):
+def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
     try:
         status = getPiStatus(logger, mic)
