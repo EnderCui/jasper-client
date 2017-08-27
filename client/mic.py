@@ -2,6 +2,8 @@
 """
     The Mic class handles all interactions with the microphone and speaker.
 """
+import ctypes
+import mute_alsa
 import logging
 import tempfile
 import wave
@@ -33,6 +35,11 @@ class Mic:
         self._logger.info("Initializing PyAudio. ALSA/Jack error messages " +
                           "that pop up during this process are normal and " +
                           "can usually be safely ignored.")
+        try:
+            asound = ctypes.cdll.LoadLibrary('libasound.so.2')
+            asound.snd_lib_error_set_handler(mute_alsa.c_error_handler)
+        except OSError:
+            pass
         self._audio = pyaudio.PyAudio()
         self._logger.info("Initialization of PyAudio completed.")
 

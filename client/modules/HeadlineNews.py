@@ -52,7 +52,7 @@ def handle(text, mic, profile, bot=None):
         return
     key = profile[SLUG]['key']
     news = request(key, mic, logger)
-    if bot not None:
+    if bot is not None:
         bot.sendMessage(news)
 
 def isValid(text):
