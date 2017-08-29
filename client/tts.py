@@ -15,6 +15,7 @@ import subprocess
 import pipes
 import logging
 import urllib
+import httplib
 import requests
 from abc import ABCMeta, abstractmethod
 from uuid import getnode as get_mac
@@ -148,6 +149,104 @@ class EkhoTTS(AbstractTTSEngine):
                 self._logger.debug("Output was: '%s'", output)
         self.play(fname)
         os.remove(fname)
+
+class VoicerssTTS(AbstractMp3TTSEngine):
+    SLUG = "voicerss-tts"
+
+    def __init__(self, api_key):
+        self._logger = logging.getLogger(__name__)
+        self.api_key = api_key
+
+    @classmethod
+    def get_config(cls):
+        config = {}
+        profile_path = jasperpath.config('profile.yml')
+        if os.path.exists(profile_path):
+            with open(profile_path, 'r') as f:
+                profile = yaml.safe_load(f)
+                if 'voicerss' in profile:
+                    if 'api_key' in profile['voicerss']:
+                        config['api_key'] = \
+                            profile['voicerss']['api_key']
+        return config
+
+    @classmethod
+    def is_available(cls):
+        return diagnose.check_network_connection()
+
+    def speech(self, settings):
+        self.validate(settings)
+        return self.request(settings)
+
+    def validate(self, settings):
+        if not settings:
+            raise RuntimeError('The settings are undefined')
+        if 'key' not in settings or not settings['key']:
+            raise RuntimeError('The API key is undefined')
+        if 'src' not in settings or not settings['src']:
+            raise RuntimeError('The text is undefined')
+        if 'hl' not in settings or not settings['hl']:
+            raise RuntimeError('The language is undefined')
+
+    def request(self, settings):
+        result = {'error': None, 'response': None}
+
+        headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
+        params = urllib.urlencode(self.buildRequest(settings))
+
+        if 'ssl' in settings and settings['ssl']:
+            conn = httplib.HTTPSConnection('api.voicerss.org:443')
+        else:
+            conn = httplib.HTTPConnection('api.voicerss.org:80')
+
+        conn.request('POST', '/', params, headers)
+
+        response = conn.getresponse()
+        content = response.read()
+
+        if response.status != 200:
+            result['error'] = response.reason
+        elif content.find('ERROR') == 0:
+            result['error'] = content
+        else:
+            result['response'] = content
+
+        conn.close()
+
+        return result
+
+    def buildRequest(self, settings):
+        params = {'key': '', 'src': '', 'hl': '', 'r': '', 'c': '', 'f': '', 'ssml': '', 'b64': ''}
+
+        if 'key' in settings: params['key'] = settings['key']
+        if 'src' in settings: params['src'] = settings['src']
+        if 'hl' in settings: params['hl'] = settings['hl']
+        if 'r' in settings: params['r'] = settings['r']
+        if 'c' in settings: params['c'] = settings['c']
+        if 'f' in settings: params['f'] = settings['f']
+        if 'ssml' in settings: params['ssml'] = settings['ssml']
+        if 'b64' in settings: params['b64'] = settings['b64']
+
+        return params
+
+    def say(self, phrase):
+        self._logger.debug("Saying '%s' with '%s'", phrase, self.SLUG)
+        voice = self.speech({
+            'key': self.api_key,
+            'hl': 'zh-cn',
+            'src': phrase,
+            'r': '0',
+            'c': 'mp3',
+            'f': '44khz_16bit_stereo',
+            'ssml': 'false',
+            'b64': 'false'
+        })
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+            f.write(voice['response'])
+            tmpfile = f.name
+        if tmpfile is not None:
+            self.play_mp3(tmpfile)
+            os.remove(tmpfile)
 
 class BaiduTTS(AbstractMp3TTSEngine):
     SLUG = "baidu-tts"

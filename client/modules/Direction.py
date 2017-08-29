@@ -8,7 +8,7 @@ from urllib import urlencode
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-WORDS = ["DAOHANG"]
+WORDS = ["XIANLU"]
 SLUG = "direction"
 
 def request(url, params):
