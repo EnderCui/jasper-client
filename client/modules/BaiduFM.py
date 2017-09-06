@@ -41,7 +41,7 @@ class MusicPlayer(threading.Thread):
                     self.pick_next()
 
     def play(self):
-        self.logger.error('MusicPlayer play')
+        self.logger.debug('MusicPlayer play')
         song_url = "http://music.baidu.com/data/music/fmlink?type=mp3&rate=320&songIds=%s" % self.playlist[self.idx]['id']
         song_name, song_link, song_size, song_time = self.get_song_real_url(song_url)
         self.download_mp3_by_link(song_link, song_name, song_size)
@@ -61,7 +61,7 @@ class MusicPlayer(threading.Thread):
             song_size = int(content['data']['songList'][0]['size'])
             song_time = int(content['data']['songList'][0]['time'])
         except:
-            self.logger.info('get real link failed')
+            self.logger.error('get real link failed')
             return(None, None, 0)
 
         return song_name, song_link, song_size, song_time
@@ -72,15 +72,15 @@ class MusicPlayer(threading.Thread):
         if os.path.exists(self.song_file):
             if not self.is_stop:
                 cmd = ['play', self.song_file]
-                self.logger.info('begin to play')
+                self.logger.debug('begin to play')
                 with tempfile.TemporaryFile() as f:
                     subprocess.call(cmd, stdout=f, stderr=f)
                     f.seek(0)
                     output = f.read()
                     print(output)
-            self.logger.info('play done')
+            self.logger.debug('play done')
             if not self.is_pause:
-                self.logger.info('song_file remove')
+                self.logger.debug('song_file remove')
                 os.remove(self.song_file)
 
     def download_mp3_by_link(self, song_link, song_name, song_size):
@@ -89,7 +89,7 @@ class MusicPlayer(threading.Thread):
         self.song_file = os.path.join(self.directory, file_name)
         if os.path.exists(self.song_file):
             return
-        self.logger.info("begin DownLoad %s, size = %d" % (song_name, song_size))
+        self.logger.debug("begin DownLoad %s, size = %d" % (song_name, song_size))
         mp3 = urlopen(song_link)
 
         block_size = 8192
@@ -110,12 +110,12 @@ class MusicPlayer(threading.Thread):
                 file.write(buffer)
 
                 if down_loaded_size >= song_size:
-                    self.logger.info('%s download finshed' % self.song_file)
+                    self.logger.debug('%s download finshed' % self.song_file)
                     break
 
             except:
                 if os.path.getsize(self.song_file) < song_size:
-                    self.logger.info('song_file remove')
+                    self.logger.debug('song_file remove')
                     if os.path.exists(self.song_file):
                         os.remove(self.song_file)
                 break
@@ -189,7 +189,7 @@ def handle(text, mic, profile, bot=None):
             try:
                 threshold, transcribed = mic.passiveListen(persona)
             except Exception, e:
-                logger.debug(e)
+                logger.error(e)
                 threshold, transcribed = (None, None)
 
             if not transcribed or not threshold:
