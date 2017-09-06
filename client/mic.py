@@ -130,6 +130,7 @@ class Mic:
 
         # stores the lastN score values
         lastN = [i for i in range(30)]
+        didDetect = False
 
         # calculate the long run average, and thereby the proper threshold
         for i in range(0, RATE / CHUNK * THRESHOLD_TIME):
