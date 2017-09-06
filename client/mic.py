@@ -77,17 +77,25 @@ class Mic:
 
         # calculate the long run average, and thereby the proper threshold
         for i in range(0, RATE / CHUNK * THRESHOLD_TIME):
+            try:
+                data = stream.read(CHUNK)
+                frames.append(data)
 
-            data = stream.read(CHUNK)
-            frames.append(data)
+                # save this data point as a score
+                lastN.pop(0)
+                lastN.append(self.getScore(data))
+                average = sum(lastN) / len(lastN)
 
-            # save this data point as a score
-            lastN.pop(0)
-            lastN.append(self.getScore(data))
-            average = sum(lastN) / len(lastN)
+            except Exception, e:
+                self._logger.debug(e)
+                continue
 
-        stream.stop_stream()
-        stream.close()
+        try:
+            stream.stop_stream()
+            stream.close()
+        except Exception, e:
+            self._logger.debug(e)
+            pass
 
         # this will be the benchmark to cause a disturbance over!
         THRESHOLD = average * THRESHOLD_MULTIPLIER
@@ -126,40 +134,60 @@ class Mic:
         # calculate the long run average, and thereby the proper threshold
         for i in range(0, RATE / CHUNK * THRESHOLD_TIME):
 
-            data = stream.read(CHUNK)
-            frames.append(data)
+            try:
+                if self.stop_passive:
+                    break
 
-            # save this data point as a score
-            lastN.pop(0)
-            lastN.append(self.getScore(data))
-            average = sum(lastN) / len(lastN)
+                data = stream.read(CHUNK)
+                frames.append(data)
 
-        # this will be the benchmark to cause a disturbance over!
-        THRESHOLD = average * THRESHOLD_MULTIPLIER
+                # save this data point as a score
+                lastN.pop(0)
+                lastN.append(self.getScore(data))
+                average = sum(lastN) / len(lastN)
 
-        # save some memory for sound data
-        frames = []
+                # this will be the benchmark to cause a disturbance over!
+                THRESHOLD = average * THRESHOLD_MULTIPLIER
 
-        # flag raised when sound disturbance detected
-        didDetect = False
+                # save some memory for sound data
+                frames = []
+
+                # flag raised when sound disturbance detected
+                didDetect = False
+            except Exception, e:
+                self._logger.debug(e)
+                pass
 
         # start passively listening for disturbance above threshold
         for i in range(0, RATE / CHUNK * LISTEN_TIME):
 
-            data = stream.read(CHUNK)
-            frames.append(data)
-            score = self.getScore(data)
+            try:
+                if self.stop_passive:
+                    break
 
-            if score > THRESHOLD:
-                didDetect = True
-                break
+                data = stream.read(CHUNK)
+                frames.append(data)
+                score = self.getScore(data)
+
+                if score > THRESHOLD:
+                    didDetect = True
+                    break
+            except Exception, e:
+                self._logger.debug(e)
+                continue
 
         # no use continuing if no flag raised
         if not didDetect:
             print "No disturbance detected"
-            stream.stop_stream()
-            stream.close()
+            try:
+                self.stop_passive = False
+                stream.stop_stream()
+                stream.close()
+            except Exception, e:
+                self._logger.debug(e)
+                pass
             return (None, None)
+
 
         # cutoff any recording before this disturbance was detected
         frames = frames[-20:]
@@ -167,13 +195,23 @@ class Mic:
         # otherwise, let's keep recording for few seconds and save the file
         DELAY_MULTIPLIER = 1
         for i in range(0, RATE / CHUNK * DELAY_MULTIPLIER):
-
-            data = stream.read(CHUNK)
-            frames.append(data)
+            try:
+                if self.stop_passive:
+                    break
+                data = stream.read(CHUNK)
+                frames.append(data)
+            except Exception, e:
+                self._logger.debug(e)
+                continue
 
         # save the audio data
-        stream.stop_stream()
-        stream.close()
+        try:
+            self.stop_passive = False
+            stream.stop_stream()
+            stream.close()
+        except Exception, e:
+            self._logger.debug(e)
+            pass
 
         with tempfile.NamedTemporaryFile(mode='w+b') as f:
             wav_fp = wave.open(f, 'wb')
@@ -186,7 +224,8 @@ class Mic:
             # check if PERSONA was said
             transcribed = self.passive_stt_engine.transcribe(f)
 
-        if any(PERSONA in phrase for phrase in transcribed):
+        if transcribed is not None and \
+           any(PERSONA in phrase for phrase in transcribed):
             return (THRESHOLD, PERSONA)
 
         return (False, transcribed)
@@ -218,14 +257,13 @@ class Mic:
         if THRESHOLD is None:
             THRESHOLD = self.fetchThreshold()
 
-        self.speaker.play(jasperpath.data('audio', 'beep_hi.wav'))
-
         # prepare recording stream
         stream = self._audio.open(format=pyaudio.paInt16,
                                   channels=1,
                                   rate=RATE,
                                   input=True,
                                   frames_per_buffer=CHUNK)
+        self.speaker.play(jasperpath.data('audio', 'beep_hi.wav'))
 
         frames = []
         # increasing the range # results in longer pause after command
@@ -233,25 +271,32 @@ class Mic:
         lastN = [THRESHOLD * 1.2 for i in range(30)]
 
         for i in range(0, RATE / CHUNK * LISTEN_TIME):
+            try:
+                data = stream.read(CHUNK)
+                frames.append(data)
+                score = self.getScore(data)
 
-            data = stream.read(CHUNK)
-            frames.append(data)
-            score = self.getScore(data)
+                lastN.pop(0)
+                lastN.append(score)
 
-            lastN.pop(0)
-            lastN.append(score)
+                average = sum(lastN) / float(len(lastN))
 
-            average = sum(lastN) / float(len(lastN))
-
-            # TODO: 0.8 should not be a MAGIC NUMBER!
-            if average < THRESHOLD * 0.8:
-                break
+                # TODO: 0.8 should not be a MAGIC NUMBER!
+                if average < THRESHOLD * 0.8:
+                    break
+            except Exception, e:
+                self._logger.debug(e)
+                continue
 
         self.speaker.play(jasperpath.data('audio', 'beep_lo.wav'))
 
         # save the audio data
-        stream.stop_stream()
-        stream.close()
+        try:
+            stream.stop_stream()
+            stream.close()
+        except Exception, e:
+            self._logger.debug(e)
+            pass
 
         with tempfile.SpooledTemporaryFile(mode='w+b') as f:
             wav_fp = wave.open(f, 'wb')
