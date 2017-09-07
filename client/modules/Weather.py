@@ -57,7 +57,7 @@ def handle(text, mic, profile, bot=None):
         location = profile[SLUG]['location']
     else:
         location = profile['location']
-    WEATHER_API = 'https://api.seniverse.com/v3/weather/daily.json'        
+    WEATHER_API = 'https://api.seniverse.com/v3/weather/daily.json'
     SUGGESTION_API = 'https://api.seniverse.com/v3/life/suggestion.json'
     try:
         weather = fetch_weather(WEATHER_API, key, location)

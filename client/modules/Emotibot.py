@@ -79,6 +79,10 @@ def handle(text, mic, profile, bot=None):
        'location' not in profile[SLUG]:
         mic.say(u"插件配置有误，插件使用失败")
         return
+    if not isValid(text):
+        logger.info("use as default handler")
+        chat(text, profile[SLUG], mic, bot)
+        return
 
     mic.say(u'hello')
     if 'robot_name' in profile:

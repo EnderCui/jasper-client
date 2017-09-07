@@ -21,7 +21,7 @@ class Brain(object):
 
         self.mic = mic
         self.profile = profile
-        self.modules = self.get_modules()
+        self.modules, self.default_module = self.get_modules()
         self._logger = logging.getLogger(__name__)
 
     @classmethod
@@ -37,6 +37,7 @@ class Brain(object):
         logger.debug("Looking for modules in: %s",
                      ', '.join(["'%s'" % location for location in locations]))
         modules = []
+        default_module = None
         for finder, name, ispkg in pkgutil.walk_packages(locations):
             try:
                 loader = finder.find_module(name)
@@ -49,12 +50,14 @@ class Brain(object):
                     logger.debug("Found module '%s' with words: %r", name,
                                  mod.WORDS)
                     modules.append(mod)
+                    if name == "Emotibot":
+                        default_module = mod
                 else:
                     logger.warning("Skipped module '%s' because it misses " +
                                    "the WORDS constant.", name)
         modules.sort(key=lambda mod: mod.PRIORITY if hasattr(mod, 'PRIORITY')
                      else 0, reverse=True)
-        return modules
+        return modules, default_module
 
     def query(self, texts, bot=None):
         """
@@ -64,23 +67,30 @@ class Brain(object):
         Arguments:
         text -- user input, typically speech, to be parsed by a module
         """
+        matched_module = None
         for module in self.modules:
             for text in texts:
                 if module.isValid(text):
                     self._logger.debug("'%s' is a valid phrase for module " +
                                        "'%s'", text, module.__name__)
-                    try:
-                        module.handle(text, self.mic, self.profile, bot)
-                    except Exception:
-                        self._logger.error('Failed to execute module',
-                                           exc_info=True)
-                        self.mic.say("I'm sorry. I had some trouble with " +
-                                     "that operation. Please try again later.")
-                    else:
-                        self._logger.debug("Handling of phrase '%s' by " +
-                                           "module '%s' completed", text,
-                                           module.__name__)
-                    finally:
-                        return
-        self._logger.debug("No module was able to handle any of these " +
+                    matched_module = module
+                    break
+
+        if matched_module is None and self.default_module is not None:
+            matched_module = self.default_module
+
+        if matched_module is not None:
+            try:
+                matched_module.handle(text, self.mic, self.profile, bot)
+            except Exception:
+                self._logger.error('Failed to execute module',
+                                   exc_info=True)
+                self.mic.say("I'm sorry. I had some trouble with " +
+                             "that operation. Please try again later.")
+            else:
+                self._logger.debug("Handling of phrase '%s' by " +
+                                   "module '%s' completed", text,
+                                   module.__name__)
+        else:
+            self._logger.debug("No module was able to handle any of these " +
                            "phrases: %r", texts)
