@@ -4,9 +4,11 @@ import os
 import base64
 import wave
 import json
+import time
 import tempfile
 import logging
 import urllib
+import hashlib
 from abc import ABCMeta, abstractmethod
 import requests
 import yaml
@@ -438,6 +440,80 @@ class SnowboySTT(AbstractSTTEngine):
     @classmethod
     def is_available(cls):
         return diagnose.check_python_import('snowboy.snowboydetect')
+
+class XfyunSTT(AbstractSTTEngine):
+    SLUG = "xfyun-stt"
+
+    def __init__(self, app_id, api_key):
+        self._logger = logging.getLogger(__name__)
+        self.app_id = app_id
+        self.api_key = api_key
+
+    @classmethod
+    def get_config(cls):
+        config = {}
+        profile_path = jasperpath.config('profile.yml')
+        if os.path.exists(profile_path):
+            with open(profile_path, 'r') as f:
+                profile = yaml.safe_load(f)
+                if 'xfyun-sst' in profile:
+                    if 'app_id' in profile['xfyun-sst']:
+                        config['app_id'] = \
+                            profile['xfyun-sst']['app_id']
+                    if 'api_key' in profile['xfyun-sst']:
+                        config['api_key'] = \
+                            profile['xfyun-sst']['api_key']
+        return config
+
+    def get_param(self):
+        param = json.dumps({"auf":"16k","aue":"raw","scene":"main"})
+        return base64.b64encode(param)
+
+    def get_checksum(self, data):
+        s = self.api_key + str(int(time.time())) + self.get_param() + "data=" + data
+        return hashlib.md5(s.encode('utf-8')).hexdigest()
+
+
+    def transcribe(self, fp):
+        try:
+            wav_file = wave.open(fp, 'rb')
+        except IOError:
+            self._logger.critical('wav file not found: %s',
+                                  fp,
+                                  exc_info=True)
+            return []
+        n_frames = wav_file.getnframes()
+        frame_rate = wav_file.getframerate()
+        audio = wav_file.readframes(n_frames)
+        base_data = base64.b64encode(audio)
+
+        data = {"data": base_data}
+
+        r = requests.post('http://api.xfyun.cn/v1/aiui/v1/iat',
+                          data=data,
+                          headers={'X-Appid': self.app_id,
+                          'X-CurTime': str(int(time.time())),
+                          'X-Param': self.get_param(),
+                          'X-CheckSum': self.get_checksum(base_data)})
+        result = json.loads(r.text)
+        if result["code"] == "00000":
+            text = ''
+            if 'data' in result and result['data']['ret'] == 0:
+                text = result['data']['result'].encode('utf-8')
+                transcribed = []
+                if text:
+                    transcribed.append(text.upper())
+                    self._logger.info(u'讯飞语音识别到了: %s' % text)
+                return transcribed
+            else:
+                return []
+        else :
+            self._logger.error(result)
+            return []
+
+    @classmethod
+    def is_available(cls):
+        return diagnose.check_network_connection()
 
 def get_engine_by_slug(slug=None):
     """
