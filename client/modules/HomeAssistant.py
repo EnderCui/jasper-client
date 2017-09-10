@@ -13,7 +13,7 @@ SLUG = "home_assistant"
 
 PHRASES = [u"打开", u"关闭"]
 
-DEVICES = {u"电视": 'switch.tv_sony', u"格力空调": 'switch.gree_ac_power', \
+DEVICES = {u"电视": 'media_player.sony_bravia_tv', u"格力空调": 'switch.gree_ac_power', \
            u"美的空调": 'switch.midea_ac_power', u"盒子": 'switch.damai_box_power', \
            u"灯": 'switch.panasonic_light_power'}
 def handle(text, mic, profile, bot=None):
