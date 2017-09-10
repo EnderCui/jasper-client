@@ -5,10 +5,12 @@ import base64
 import wave
 import json
 import time
+import datetime
 import tempfile
 import logging
 import urllib
 import hashlib
+import hmac
 from abc import ABCMeta, abstractmethod
 import requests
 import yaml
@@ -456,13 +458,13 @@ class XfyunSTT(AbstractSTTEngine):
         if os.path.exists(profile_path):
             with open(profile_path, 'r') as f:
                 profile = yaml.safe_load(f)
-                if 'xfyun-sst' in profile:
-                    if 'app_id' in profile['xfyun-sst']:
+                if 'xfyun' in profile:
+                    if 'app_id' in profile['xfyun']:
                         config['app_id'] = \
-                            profile['xfyun-sst']['app_id']
-                    if 'api_key' in profile['xfyun-sst']:
+                            profile['xfyun']['app_id']
+                    if 'api_key' in profile['xfyun']:
                         config['api_key'] = \
-                            profile['xfyun-sst']['api_key']
+                            profile['xfyun']['api_key']
         return config
 
     def get_param(self):
@@ -507,6 +509,86 @@ class XfyunSTT(AbstractSTTEngine):
                 return transcribed
             else:
                 return []
+        else :
+            self._logger.error(result)
+            return []
+
+    @classmethod
+    def is_available(cls):
+        return diagnose.check_network_connection()
+
+class AliyunSTT(AbstractSTTEngine):
+    SLUG = "aliyun-stt"
+
+    def __init__(self, ak_id, ak_secret):
+        self._logger = logging.getLogger(__name__)
+        self.ak_id = ak_id
+        self.ak_secret = ak_secret
+
+    @classmethod
+    def get_config(cls):
+        config = {}
+        profile_path = jasperpath.config('profile.yml')
+        if os.path.exists(profile_path):
+            with open(profile_path, 'r') as f:
+                profile = yaml.safe_load(f)
+                if 'aliyun' in profile:
+                    if 'ak_id' in profile['aliyun']:
+                        config['ak_id'] = \
+                            profile['aliyun']['ak_id']
+                    if 'ak_secret' in profile['aliyun']:
+                        config['ak_secret'] = \
+                            profile['aliyun']['ak_secret']
+        return config
+
+    def get_authorization(self, audioData, date):
+        bodyMd5 = base64.b64encode(hashlib.md5(audioData).digest())
+        md52 = base64.b64encode(hashlib.md5(bodyMd5).digest())
+
+        method = "POST"
+        accept = "application/json"
+        content_type = "audio/wav; samplerate=16000"
+        stringToSign = method + "\n" + accept + "\n" + md52 + "\n" + content_type + "\n" + date
+        signature = base64.b64encode(hmac.new(self.ak_secret, stringToSign, hashlib.sha1).digest())
+
+        authHeader = "Dataplus " + self.ak_id + ":" + signature
+        return authHeader
+
+    def get_gmttime(self):
+        GMT_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
+        return datetime.datetime.utcnow().strftime(GMT_FORMAT)
+
+    def transcribe(self, fp):
+        try:
+            wav_file = wave.open(fp, 'rb')
+        except IOError:
+            self._logger.critical('wav file not found: %s',
+                                  fp,
+                                  exc_info=True)
+            return []
+        n_frames = wav_file.getnframes()
+        frame_rate = wav_file.getframerate()
+        audioData = wav_file.readframes(n_frames)
+
+        url = "http://nlsapi.aliyun.com/recognize?"
+        model = "chat";
+        url = url + "model=" + model;
+        date = self.get_gmttime()
+        r = requests.post(url,
+                          data=audioData,
+                          headers={'Authorization': self.get_authorization(audioData, date),
+                          'Content-type': 'audio/wav; samplerate=16000',
+                          'Accept': 'application/json',
+                          'Date': date,
+                          'Content-Length': len(audioData)})
+        result = json.loads(r.text)
+        if 'result' in result:
+            text = result['result'].encode('utf-8')
+            transcribed = []
+            if text:
+                transcribed.append(text.upper())
+                self._logger.info(u'阿里语音识别到了: %s' % text)
+            return transcribed
         else :
             self._logger.error(result)
             return []
