@@ -8,6 +8,7 @@ Speaker methods:
     is_available - returns True if the platform supports this implementation
 """
 import os
+import base64
 import platform
 import re
 import tempfile
@@ -17,6 +18,9 @@ import logging
 import urllib
 import httplib
 import requests
+import datetime
+import hashlib
+import hmac
 from abc import ABCMeta, abstractmethod
 from uuid import getnode as get_mac
 import argparse
@@ -336,7 +340,83 @@ class BaiduTTS(AbstractMp3TTSEngine):
         self._logger.debug(u"Saying '%s' with '%s'", phrase, self.SLUG)
         tmpfile = self.get_speech(phrase)
         if tmpfile is not None:
-            self.play_mp3(tmpfile)
+            self.play(tmpfile)
+            os.remove(tmpfile)
+
+class AliyunTTS(AbstractTTSEngine):
+    SLUG = "aliyun-tts"
+
+    def __init__(self, ak_id, ak_secret):
+        self._logger = logging.getLogger(__name__)
+        self.ak_id = ak_id
+        self.ak_secret = ak_secret
+
+    @classmethod
+    def get_config(cls):
+        config = {}
+        profile_path = jasperpath.config('profile.yml')
+        if os.path.exists(profile_path):
+            with open(profile_path, 'r') as f:
+                profile = yaml.safe_load(f)
+                if 'aliyun' in profile:
+                    if 'ak_id' in profile['aliyun']:
+                        config['ak_id'] = \
+                            profile['aliyun']['ak_id']
+                    if 'ak_secret' in profile['aliyun']:
+                        config['ak_secret'] = \
+                            profile['aliyun']['ak_secret']
+        return config
+
+    def get_authorization(self, phrase, date):
+        bodyMd5 = base64.b64encode(hashlib.md5(phrase).digest())
+        #md52 = base64.b64encode(hashlib.md5(bodyMd5).digest())
+
+        method = "POST"
+        accept = "audio/wav, application/json"
+        content_type = "text/plain"
+        stringToSign = method + "\n" + accept + "\n" + bodyMd5 + "\n" + content_type + "\n" + date
+        signature = base64.b64encode(hmac.new(self.ak_secret, stringToSign, hashlib.sha1).digest())
+
+        authHeader = "Dataplus " + self.ak_id + ":" + signature
+        return authHeader
+
+    def get_gmttime(self):
+        GMT_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
+        return datetime.datetime.utcnow().strftime(GMT_FORMAT)
+
+    def get_speech(self, phrase):
+        url = "http://nlsapi.aliyun.com/speak?encode_type=wav&voice_name=xiaoyun&volume=50"
+        date = self.get_gmttime()
+        r = requests.post(url,
+                          data=phrase,
+                          headers={'Authorization': self.get_authorization(phrase, date),
+                          'Content-type': 'text/plain',
+                          'Accept': 'audio/wav, application/json',
+                          'Date': date,
+                          'Content-Length': str(len(phrase))})
+
+        try:
+            r.raise_for_status()
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+                f.write(r.content)
+                tmpfile = f.name
+                return tmpfile
+        except Exception:
+            if 'error_code' in r.json():
+                self._logger.critical('Aliyun TTS failed with response: %r',
+                                      r.json()['error_code'],
+                                      exc_info=True)
+                return None
+
+    @classmethod
+    def is_available(cls):
+        return diagnose.check_network_connection()
+
+    def say(self, phrase):
+        self._logger.debug(u"Saying '%s' with '%s'", phrase, self.SLUG)
+        tmpfile = self.get_speech(phrase.encode('utf-8'))
+        if tmpfile is not None:
+            self.play(tmpfile)
             os.remove(tmpfile)
 
 def get_default_engine_slug():

@@ -580,7 +580,7 @@ class AliyunSTT(AbstractSTTEngine):
                           'Content-type': 'audio/wav; samplerate=16000',
                           'Accept': 'application/json',
                           'Date': date,
-                          'Content-Length': len(audioData)})
+                          'Content-Length': str(len(audioData))})
         result = json.loads(r.text)
         if 'result' in result:
             text = result['result'].encode('utf-8')
