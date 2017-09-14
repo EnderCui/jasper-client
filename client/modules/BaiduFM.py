@@ -1,15 +1,12 @@
 # -*- coding: utf-8-*-
 import json
-import threading
-import re
+import logging
 import os
-import tempfile
 import socket
 import subprocess
-import threading
 import sys
-import logging
-import time
+import tempfile
+import threading
 from urllib import urlopen
 
 reload(sys)
@@ -18,6 +15,9 @@ socket.setdefaulttimeout(10)
 
 WORDS = ["BAIDUYINYUE"]
 SLUG = "baidufm"
+
+DEFAULT_CHANNEL = 14
+
 
 class MusicPlayer(threading.Thread):
 
@@ -42,18 +42,20 @@ class MusicPlayer(threading.Thread):
 
     def play(self):
         self.logger.debug('MusicPlayer play')
-        song_url = "http://music.baidu.com/data/music/fmlink?type=mp3&rate=320&songIds=%s" % self.playlist[self.idx]['id']
-        song_name, song_link, song_size, song_time = self.get_song_real_url(song_url)
+        song_url = "http://music.baidu.com/data/music/fmlink?" +\
+            "type=mp3&rate=320&songIds=%s" % self.playlist[self.idx]['id']
+        song_name, song_link, song_size, song_time =\
+            self.get_song_real_url(song_url)
         self.download_mp3_by_link(song_link, song_name, song_size)
         self.play_mp3_by_link(song_link, song_name, song_size, song_time)
 
     def get_song_real_url(self, song_url):
         try:
-            htmlDoc = urlopen(song_url).read().decode('utf8')
+            htmldoc = urlopen(song_url).read().decode('utf8')
         except:
             return(None, None, 0)
 
-        content = json.loads(htmlDoc)
+        content = json.loads(htmldoc)
 
         try:
             song_link = content['data']['songList'][0]['songLink']
@@ -89,7 +91,7 @@ class MusicPlayer(threading.Thread):
         self.song_file = os.path.join(self.directory, file_name)
         if os.path.exists(self.song_file):
             return
-        self.logger.debug("begin DownLoad %s, size = %d" % (song_name, song_size))
+        self.logger.debug("begin DownLoad %s size %d" % (song_name, song_size))
         mp3 = urlopen(song_link)
 
         block_size = 8192
@@ -147,28 +149,31 @@ class MusicPlayer(threading.Thread):
             os.remove(self.song_file)
         if os.path.exists(self.directory):
             os.removedirs(self.directory)
-		
+
+
 def get_channel_list(page_url):
     try:
-        htmlDoc = urlopen(page_url).read().decode('utf8')
+        htmldoc = urlopen(page_url).read().decode('utf8')
     except:
         return {}
 
-    content = json.loads(htmlDoc)
+    content = json.loads(htmldoc)
     channel_list = content['channel_list']
 
     return channel_list
 
+
 def get_song_list(channel_url):
     try:
-        htmlDoc = urlopen(channel_url).read().decode('utf8')
+        htmldoc = urlopen(channel_url).read().decode('utf8')
     except:
         return{}
 
-    content = json.loads(htmlDoc)
+    content = json.loads(htmldoc)
     song_id_list = content['list']
 
     return song_id_list
+
 
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
@@ -178,8 +183,18 @@ def handle(text, mic, profile, bot=None):
     if 'robot_name' in profile:
         persona = profile['robot_name']
 
+    channel = DEFAULT_CHANNEL
+
+    if SLUG in profile and 'channel' in profile[SLUG]:
+        channel = profile[SLUG]['channel']
+
+    channel_id = channel_list[channel]['channel_id']
+    channel_name = channel_list[channel]['channel_name']
+    mic.say(u"播放" + channel_name)
+
     while True:
-        channel_url = 'http://fm.baidu.com/dev/api/?tn=playlist&format=json&id=%s' % 'public_shiguang_90hou'
+        channel_url = 'http://fm.baidu.com/dev/api/' +\
+            '?tn=playlist&format=json&id=%s' % channel_id
         song_id_list = get_song_list(channel_url)
 
         music_player = MusicPlayer(song_id_list, logger)
@@ -195,6 +210,7 @@ def handle(text, mic, profile, bot=None):
             if not transcribed or not threshold:
                 logger.info("Nothing has been said or transcribed.")
                 continue
+
             music_player.pause()
             input = mic.activeListen()
 
@@ -205,6 +221,7 @@ def handle(text, mic, profile, bot=None):
             else:
                 mic.say(u"什么？")
                 music_player.resume()
+
 
 def isValid(text):
     return any(word in text for word in [u"百度音乐", u"百度电台"])
