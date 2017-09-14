@@ -53,7 +53,7 @@ class MusicPlayer(threading.Thread):
         try:
             htmldoc = urlopen(song_url).read().decode('utf8')
         except:
-            return(None, None, 0)
+            return(None, None, 0, 0)
 
         content = json.loads(htmldoc)
 
@@ -64,7 +64,7 @@ class MusicPlayer(threading.Thread):
             song_time = int(content['data']['songList'][0]['time'])
         except:
             self.logger.error('get real link failed')
-            return(None, None, 0)
+            return(None, None, 0, 0)
 
         return song_name, song_link, song_size, song_time
 
