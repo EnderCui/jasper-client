@@ -3,7 +3,8 @@ import Queue
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 import logging
-
+import app_utils
+import time
 
 class Notifier(object):
 
@@ -22,13 +23,26 @@ class Notifier(object):
         self.profile = profile
         self.notifiers = []
 
+        if 'emotibot' in profile:
+            self.notifiers.append(self.NotificationClient(
+                self.handleRemenderNotifications, None))
+
         sched = BackgroundScheduler(timezone="UTC", daemon=True)
         sched.start()
         sched.add_job(self.gather, 'interval', seconds=30)
         atexit.register(lambda: sched.shutdown(wait=False))
 
+
     def gather(self):
         [client.run() for client in self.notifiers]
+
+    def handleRemenderNotifications(self, lastDate):
+        lastDate = time.strftime('%d %b %Y %H:%M:%S')
+        due_reminders = app_utils.get_due_reminders()
+        for reminder in due_reminders:
+            self.q.put(reminder)
+
+        return lastDate
 
     def getNotification(self):
         """Returns a notification. Note that this function is consuming."""

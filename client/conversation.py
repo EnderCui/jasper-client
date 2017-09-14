@@ -25,7 +25,8 @@ class Conversation(object):
             # Print notifications until empty
             notifications = self.notifier.getAllNotifications()
             for notif in notifications:
-                self._logger.info("Received notification: '%s'", str(notif))
+                self._logger.error("Received notification: '%s'", str(notif))
+                self.mic.say(str(notif))
 
             self._logger.debug("Started listening for keyword '%s'",
                                self.persona)

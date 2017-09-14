@@ -36,7 +36,7 @@ class Mic:
             return self.prev
 
         input = raw_input("YOU: ")
-        self.prev = input
+        self.prev = input.encode('utf8')
         return input
 
     def say(self, phrase,

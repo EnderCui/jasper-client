@@ -105,7 +105,7 @@ class Jasper(object):
                 bot = Slackbot(self.config["slackbot"]["slackbot_webhook_url"])
             else:
                 bot = Slackbot()
-        #bot.startBot()
+        bot.startBot()
 
         if 'robot_name' in self.config:
             persona = self.config["robot_name"]
