@@ -1,21 +1,24 @@
 # -*- coding: utf-8-*-
-import requests
+
 import json
 import logging
-from uuid import getnode as get_mac
-
 import sys
+from uuid import getnode as get_mac
+from app_utils import create_reminder
+import requests
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
+sys.path.append('..')
 
 WORDS = ["EMOTIBOT"]
 SLUG = "emotibot"
+
 
 def chat(texts, config, mic, bot):
     msg = ''.join(texts)
     try:
         url = "http://idc.emotibot.com/api/ApiKey/openapi.php"
-        userid = str(get_mac())[:32]
         register_data = {
             "cmd": "chat",
             "appid": config['appid'],
@@ -32,6 +35,14 @@ def chat(texts, config, mic, bot):
             if isSupported(cmd):
                 responds.append(jsondata.get('data')[0].get('value'))
                 result = '\n'.join(responds)
+                if jsondata.get('data')[0]['cmd'] == 'reminder':
+                    data = jsondata.get('data')[0]
+                    remind_info = data.get('data').get('remind_info')
+                    remind_event = remind_info[0].get('remind_event')
+                    remind_time = remind_info[0].get('remind_time')
+
+                    if not create_reminder(remind_event, remind_time):
+                        result = '\n'.join('创建提醒失败了')
                 if cmd != "picture":
                     mic.say(result)
                 sendMoreToBot(jsondata.get('data')[0], bot, mic)
@@ -44,15 +55,16 @@ def chat(texts, config, mic, bot):
         print(e)
         mic.say(u"抱歉, 我的大脑短路了,请稍后再试试.")
 
+
 def isSupported(cmd):
     if cmd == "taxi" or \
-        cmd == "kuaidi" or \
-        cmd == "music" or \
-        cmd == "audio" or \
-        cmd == "reminder":
+       cmd == "kuaidi" or \
+       cmd == "music" or \
+       cmd == "audio":
         return False
     else:
         return True
+
 
 def sendMoreToBot(data, bot, mic):
     if data['cmd'] == "news":
@@ -65,11 +77,14 @@ def sendMoreToBot(data, bot, mic):
         concert_items = data.get('data').get('items')
         concerts = "concerts:"
         for item in concert_items:
-            concerts = concerts + item["title"] + "." + item["time"] + "." + item["location"] + "."
+            concerts = concerts + item["title"] + "."\
+                + item["time"] + "."\
+                + item["location"] + "."
         bot.sendMessage(concerts)
     elif data['cmd'] == "picture":
         mic.say(u"已发送")
         bot.sendMessage(data.get('value'))
+
 
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
@@ -91,7 +106,7 @@ def handle(text, mic, profile, bot=None):
     while True:
         try:
             threshold, transcribed = mic.passiveListen(persona)
-        except Exception, e:
+        except Exception:
             threshold, transcribed = (None, None)
 
         if not transcribed or not threshold:
@@ -103,6 +118,7 @@ def handle(text, mic, profile, bot=None):
             return
         else:
             chat(input, profile[SLUG], mic, bot)
+
 
 def isValid(text):
     return any(word in text for word in [u"小影", u"小影机器人"])
