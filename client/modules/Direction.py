@@ -1,9 +1,9 @@
 # -*- coding: utf-8-*-
 import sys
-import os
 import logging
-import json, urllib
-from urllib import urlencode
+import json
+import urllib
+
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -11,13 +11,15 @@ sys.setdefaultencoding('utf8')
 WORDS = ["XIANLU"]
 SLUG = "direction"
 
+
 def request(url, params):
-    params = urlencode(params)
+    params = urllib.urlencode(params)
 
     f = urllib.urlopen("%s?%s" % (url, params))
 
     content = f.read()
     return json.loads(content)
+
 
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
@@ -41,11 +43,11 @@ def handle(text, mic, profile, bot=None):
 
     url_place = "http://api.map.baidu.com/place/v2/suggestion"
     params_place = {
-        "query" : input,
-        "region" : city,
-        "city_limit" : "true",
-        "output" : "json",
-        "ak" : app_key,
+        "query": input,
+        "region": city,
+        "city_limit": "true",
+        "output": "json",
+        "ak": app_key,
     }
 
     res = request(url_place, params_place)
@@ -55,7 +57,9 @@ def handle(text, mic, profile, bot=None):
         if status == 0:
             if len(res['result']) > 0:
                 place_name = res['result'][0]["name"]
-                destination = "%f,%f" % (res['result'][0]["location"]['lat'], res['result'][0]["location"]['lng'])
+                destination = "%f,%f" %\
+                              (res['result'][0]["location"]['lat'],
+                               res['result'][0]["location"]['lng'])
             else:
                 mic.say(u"错误的位置")
                 return
@@ -70,10 +74,10 @@ def handle(text, mic, profile, bot=None):
 
     url_direction = "http://api.map.baidu.com/direction/v2/transit"
     params_direction = {
-        "origin" : origin,
-        "destination" : destination,
-        "page_size" : 1,
-        "ak" : app_key,
+        "origin": origin,
+        "destination": destination,
+        "page_size": 1,
+        "ak": app_key,
     }
 
     res = request(url_direction, params_direction)
@@ -87,7 +91,7 @@ def handle(text, mic, profile, bot=None):
                     result = place_name + u"参考路线:" + direction
                 if 'method' in profile[SLUG]:
                     if profile[SLUG]['method'] == "voice" or \
-                        bot is None:
+                            bot is None:
                         mic.say(result)
                     else:
                         bot.sendMessage(result)
@@ -101,6 +105,7 @@ def handle(text, mic, profile, bot=None):
     else:
         logger.error(u"导航接口调用失败")
         return
+
 
 def isValid(text):
     return any(word in text for word in [u"导航", u"线路", u"路线"])

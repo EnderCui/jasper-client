@@ -14,9 +14,14 @@ import jasperpath
 ERROR_HANDLER_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int,
                                       ctypes.c_char_p, ctypes.c_int,
                                       ctypes.c_char_p)
+
+
 def py_error_handler(filename, line, function, err, fmt):
     pass
+
+
 c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
+
 
 class Mic:
     def __init__(self, speaker, passive_stt_engine, active_stt_engine):
@@ -68,7 +73,7 @@ class Mic:
                                       channels=1,
                                       rate=RATE,
                                       input=True,
-                                   frames_per_buffer=CHUNK)
+                                      frames_per_buffer=CHUNK)
         except Exception, e:
             self._logger.error(e)
             return None
@@ -189,7 +194,6 @@ class Mic:
                 self._logger.error(e)
                 pass
             return (None, None)
-
 
         # cutoff any recording before this disturbance was detected
         frames = frames[-20:]

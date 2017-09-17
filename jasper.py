@@ -3,9 +3,7 @@
 
 import os
 import sys
-import shutil
 import logging
-
 import yaml
 import argparse
 
@@ -115,6 +113,7 @@ class Jasper(object):
 
         conversation = Conversation(persona, self.mic, self.config, bot)
         conversation.handleForever()
+
 
 if __name__ == "__main__":
 

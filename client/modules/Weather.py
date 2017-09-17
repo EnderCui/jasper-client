@@ -12,19 +12,21 @@ sys.setdefaultencoding('utf8')
 WORDS = ["TIANQI"]
 SLUG = "weather"
 
+
 def analyze_today(weather_code, suggestion):
     """ analyze today's weather """
+    suggestion_text = suggestion['results'][0]['suggestion']['sport']['brief']
     weather_code = int(weather_code)
     if weather_code <= 8:
-        if u'适宜' in suggestion:
+        if u'适宜' in suggestion_text:
             return u'今天天气不错，空气清新，适合出门运动哦'
         else:
             return u'空气质量比较一般，建议减少出行'
     elif weather_code in range(10, 16):
         return u'主人，出门记得带伞哦'
     elif weather_code in range(16, 19) or \
-    weather_code in range(25, 30) or \
-    weather_code in range(34, 37):
+            weather_code in range(25, 30) or \
+            weather_code in range(34, 37):
         return u'极端天气来临，尽量待屋里陪我玩吧'
     elif weather_code == 38:
         return u'天气炎热，记得多补充水分哦'
@@ -33,6 +35,7 @@ def analyze_today(weather_code, suggestion):
     else:
         return u''
 
+
 def fetch_weather(api, key, location):
     result = requests.get(api, params={
         'key': key,
@@ -40,6 +43,7 @@ def fetch_weather(api, key, location):
     }, timeout=3)
     res = json.loads(result.text, encoding='utf-8')
     return res
+
 
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
@@ -62,7 +66,7 @@ def handle(text, mic, profile, bot=None):
     try:
         weather = fetch_weather(WEATHER_API, key, location)
         logger.debug("Weather report: ", weather)
-        if weather.has_key('results'):
+        if 'results' in weather:
             daily = weather['results'][0]['daily']
             days = set([])
             day_text = [u'今天', u'明天', u'后天']
@@ -74,12 +78,14 @@ def handle(text, mic, profile, bot=None):
             responds = u'%s天气：' % location
             analyze_res = ''
             for day in days:
-                responds += u'%s：%s，%s到%s摄氏度。' % (day_text[day], daily[day]['text_day'], daily[day]['low'], daily[day]['high'])
+                responds += u'%s：%s，%s到%s摄氏度。' %\
+                            (day_text[day], daily[day]['text_day'],
+                             daily[day]['low'], daily[day]['high'])
                 if day == 0:
                     suggestion = fetch_weather(SUGGESTION_API, key, location)
-                    if suggestion.has_key('results'):
-                        suggestion_text = suggestion['results'][0]['suggestion']['sport']['brief']
-                        analyze_res = analyze_today(daily[day]['code_day'], suggestion_text)
+                    if 'results' in suggestion:
+                        weather_code = daily[day]['code_day']
+                        analyze_res = analyze_today(weather_code, suggestion)
             responds += analyze_res
             mic.say(responds)
         else:
@@ -87,6 +93,7 @@ def handle(text, mic, profile, bot=None):
     except Exception, e:
         logger.error(e)
         mic.say('抱歉，我获取不到天气数据，请稍后再试')
+
 
 def isValid(text):
     """

@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8-*-
 import os
+import re
+import sys
 import base64
 import wave
 import json
@@ -11,15 +13,16 @@ import logging
 import urllib
 import hashlib
 import hmac
-from abc import ABCMeta, abstractmethod
 import requests
 import yaml
 import jasperpath
 import diagnose
 import vocabcompiler
-from uuid import getnode as get_mac
+import subprocess
 
-import sys
+from uuid import getnode as get_mac
+from abc import ABCMeta, abstractmethod
+
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -276,6 +279,7 @@ class JuliusSTT(AbstractSTTEngine):
     def is_available(cls):
         return diagnose.check_executable('julius')
 
+
 class BaiduSTT(AbstractSTTEngine):
     SLUG = "baidu-stt"
 
@@ -376,6 +380,7 @@ class BaiduSTT(AbstractSTTEngine):
     def is_available(cls):
         return diagnose.check_network_connection()
 
+
 class SnowboySTT(AbstractSTTEngine):
     SLUG = "snowboy-stt"
 
@@ -443,6 +448,7 @@ class SnowboySTT(AbstractSTTEngine):
     def is_available(cls):
         return diagnose.check_python_import('snowboy.snowboydetect')
 
+
 class XfyunSTT(AbstractSTTEngine):
     SLUG = "xfyun-stt"
 
@@ -460,21 +466,19 @@ class XfyunSTT(AbstractSTTEngine):
                 profile = yaml.safe_load(f)
                 if 'xfyun' in profile:
                     if 'app_id' in profile['xfyun']:
-                        config['app_id'] = \
-                            profile['xfyun']['app_id']
+                        config['app_id'] = profile['xfyun']['app_id']
                     if 'api_key' in profile['xfyun']:
-                        config['api_key'] = \
-                            profile['xfyun']['api_key']
+                        config['api_key'] = profile['xfyun']['api_key']
         return config
 
     def get_param(self):
-        param = json.dumps({"auf":"16k","aue":"raw","scene":"main"})
+        param = json.dumps({"auf": "16k", "aue": "raw", "scene": "main"})
         return base64.b64encode(param)
 
     def get_checksum(self, data):
-        s = self.api_key + str(int(time.time())) + self.get_param() + "data=" + data
+        s = self.api_key + str(int(time.time())) +\
+                self.get_param() + "data=" + data
         return hashlib.md5(s.encode('utf-8')).hexdigest()
-
 
     def transcribe(self, fp):
         try:
@@ -485,18 +489,17 @@ class XfyunSTT(AbstractSTTEngine):
                                   exc_info=True)
             return []
         n_frames = wav_file.getnframes()
-        frame_rate = wav_file.getframerate()
         audio = wav_file.readframes(n_frames)
         base_data = base64.b64encode(audio)
 
         data = {"data": base_data}
-
+        headers = {'X-Appid': self.app_id,
+                   'X-CurTime': str(int(time.time())),
+                   'X-Param': self.get_param(),
+                   'X-CheckSum': self.get_checksum(base_data)}
         r = requests.post('http://api.xfyun.cn/v1/aiui/v1/iat',
                           data=data,
-                          headers={'X-Appid': self.app_id,
-                          'X-CurTime': str(int(time.time())),
-                          'X-Param': self.get_param(),
-                          'X-CheckSum': self.get_checksum(base_data)})
+                          headers=headers)
         result = json.loads(r.text)
         if result["code"] == "00000":
             text = ''
@@ -509,13 +512,14 @@ class XfyunSTT(AbstractSTTEngine):
                 return transcribed
             else:
                 return []
-        else :
+        else:
             self._logger.error(result)
             return []
 
     @classmethod
     def is_available(cls):
         return diagnose.check_network_connection()
+
 
 class AliyunSTT(AbstractSTTEngine):
     SLUG = "aliyun-stt"
@@ -548,8 +552,10 @@ class AliyunSTT(AbstractSTTEngine):
         method = "POST"
         accept = "application/json"
         content_type = "audio/wav; samplerate=16000"
-        stringToSign = method + "\n" + accept + "\n" + md52 + "\n" + content_type + "\n" + date
-        signature = base64.b64encode(hmac.new(self.ak_secret, stringToSign, hashlib.sha1).digest())
+        stringToSign = method + "\n" + accept + "\n" +\
+            md52 + "\n" + content_type + "\n" + date
+        hmac_sha1 = hmac.new(self.ak_secret, stringToSign, hashlib.sha1)
+        signature = base64.b64encode(hmac_sha1.digest())
 
         authHeader = "Dataplus " + self.ak_id + ":" + signature
         return authHeader
@@ -567,20 +573,20 @@ class AliyunSTT(AbstractSTTEngine):
                                   exc_info=True)
             return []
         n_frames = wav_file.getnframes()
-        frame_rate = wav_file.getframerate()
         audioData = wav_file.readframes(n_frames)
 
         url = "http://nlsapi.aliyun.com/recognize?"
-        model = "chat";
-        url = url + "model=" + model;
+        model = "chat"
+        url = url + "model=" + model
         date = self.get_gmttime()
+        headers = {'Authorization': self.get_authorization(audioData, date),
+                   'Content-type': 'audio/wav; samplerate=16000',
+                   'Accept': 'application/json',
+                   'Date': date,
+                   'Content-Length': str(len(audioData))}
         r = requests.post(url,
                           data=audioData,
-                          headers={'Authorization': self.get_authorization(audioData, date),
-                          'Content-type': 'audio/wav; samplerate=16000',
-                          'Accept': 'application/json',
-                          'Date': date,
-                          'Content-Length': str(len(audioData))})
+                          headers=headers)
         result = json.loads(r.text)
         if 'result' in result:
             text = result['result'].encode('utf-8')
@@ -589,13 +595,14 @@ class AliyunSTT(AbstractSTTEngine):
                 transcribed.append(text.upper())
                 self._logger.info(u'阿里语音识别到了: %s' % text)
             return transcribed
-        else :
+        else:
             self._logger.error(result)
             return []
 
     @classmethod
     def is_available(cls):
         return diagnose.check_network_connection()
+
 
 def get_engine_by_slug(slug=None):
     """

@@ -6,6 +6,7 @@ import logging
 import app_utils
 import time
 
+
 class Notifier(object):
 
     class NotificationClient(object):
@@ -31,7 +32,6 @@ class Notifier(object):
         sched.start()
         sched.add_job(self.gather, 'interval', seconds=30)
         atexit.register(lambda: sched.shutdown(wait=False))
-
 
     def gather(self):
         [client.run() for client in self.notifiers]

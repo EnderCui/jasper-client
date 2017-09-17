@@ -8,6 +8,7 @@ import logging
 import pyaudio
 import alteration
 
+
 class Mic:
     prev = None
 

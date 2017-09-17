@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 # 新闻头条插件
 import sys
-import os
 import logging
-import json, urllib
-from urllib import urlencode
+import json
+import urllib
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -12,13 +11,14 @@ sys.setdefaultencoding('utf8')
 WORDS = ["TOUTIAOXINWEN"]
 SLUG = "headline_news"
 
+
 def request(appkey, mic, logger, bot, m="GET"):
     url = "http://v.juhe.cn/toutiao/index"
     params = {
-        "key" : appkey,
-        "type" : "top",
+        "key": appkey,
+        "type": "top",
     }
-    params = urlencode(params)
+    params = urllib.urlencode(params)
     if m == "GET":
         f = urllib.urlopen("%s?%s" % (url, params))
     else:
@@ -29,7 +29,7 @@ def request(appkey, mic, logger, bot, m="GET"):
     if res:
         error_code = res["error_code"]
         if error_code == 0:
-            limit = 5;
+            limit = 5
             news = res["result"]["data"][0:limit]
             news_for_tts = ""
             for new in news:
@@ -43,6 +43,7 @@ def request(appkey, mic, logger, bot, m="GET"):
     else:
         mic.say(u"新闻头条接口调用错误")
 
+
 def handle(text, mic, profile, bot=None):
     logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def handle(text, mic, profile, bot=None):
         return
     key = profile[SLUG]['key']
     request(key, mic, logger, bot)
+
 
 def isValid(text):
     return any(word in text for word in [u"新闻头条", u"头条新闻", u"头条"])

@@ -93,4 +93,4 @@ class Brain(object):
                                    module.__name__)
         else:
             self._logger.debug("No module was able to handle any of these " +
-                           "phrases: %r", texts)
+                               "phrases: %r", texts)

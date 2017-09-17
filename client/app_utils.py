@@ -8,6 +8,7 @@ from pytz import timezone
 import time
 import subprocess
 
+
 def sendEmail(SUBJECT, BODY, TO, FROM, SENDER, PASSWORD, SMTP_SERVER):
     """Sends an HTML email."""
     for body_charset in 'US-ASCII', 'ISO-8859-1', 'UTF-8':

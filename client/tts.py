@@ -7,10 +7,10 @@ Speaker methods:
     play - play the audio in 'filename'
     is_available - returns True if the platform supports this implementation
 """
+import sys
 import os
 import base64
 import platform
-import re
 import tempfile
 import subprocess
 import pipes
@@ -21,15 +21,14 @@ import requests
 import datetime
 import hashlib
 import hmac
-from abc import ABCMeta, abstractmethod
-from uuid import getnode as get_mac
 import argparse
 import yaml
-
 import diagnose
 import jasperpath
 
-import sys
+from abc import ABCMeta, abstractmethod
+from uuid import getnode as get_mac
+
 reload(sys)
 sys.setdefaultencoding('utf8')
 
@@ -154,6 +153,7 @@ class EkhoTTS(AbstractTTSEngine):
         self.play(fname)
         os.remove(fname)
 
+
 class VoicerssTTS(AbstractMp3TTSEngine):
     SLUG = "voicerss-tts"
 
@@ -195,7 +195,8 @@ class VoicerssTTS(AbstractMp3TTSEngine):
     def request(self, settings):
         result = {'error': None, 'response': None}
 
-        headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
+        headers = {'Content-Type':
+                   'application/x-www-form-urlencoded; charset=UTF-8'}
         params = urllib.urlencode(self.buildRequest(settings))
 
         if 'ssl' in settings and settings['ssl']:
@@ -220,16 +221,26 @@ class VoicerssTTS(AbstractMp3TTSEngine):
         return result
 
     def buildRequest(self, settings):
-        params = {'key': '', 'src': '', 'hl': '', 'r': '', 'c': '', 'f': '', 'ssml': '', 'b64': ''}
+        params = {'key': '', 'src': '',
+                  'hl': '', 'r': '', 'c': '',
+                  'f': '', 'ssml': '', 'b64': ''}
 
-        if 'key' in settings: params['key'] = settings['key']
-        if 'src' in settings: params['src'] = settings['src']
-        if 'hl' in settings: params['hl'] = settings['hl']
-        if 'r' in settings: params['r'] = settings['r']
-        if 'c' in settings: params['c'] = settings['c']
-        if 'f' in settings: params['f'] = settings['f']
-        if 'ssml' in settings: params['ssml'] = settings['ssml']
-        if 'b64' in settings: params['b64'] = settings['b64']
+        if 'key' in settings:
+            params['key'] = settings['key']
+        if 'src' in settings:
+            params['src'] = settings['src']
+        if 'hl' in settings:
+            params['hl'] = settings['hl']
+        if 'r' in settings:
+            params['r'] = settings['r']
+        if 'c' in settings:
+            params['c'] = settings['c']
+        if 'f' in settings:
+            params['f'] = settings['f']
+        if 'ssml' in settings:
+            params['ssml'] = settings['ssml']
+        if 'b64' in settings:
+            params['b64'] = settings['b64']
 
         return params
 
@@ -251,6 +262,7 @@ class VoicerssTTS(AbstractMp3TTSEngine):
         if tmpfile is not None:
             self.play_mp3(tmpfile)
             os.remove(tmpfile)
+
 
 class BaiduTTS(AbstractMp3TTSEngine):
     SLUG = "baidu-tts"
@@ -343,6 +355,7 @@ class BaiduTTS(AbstractMp3TTSEngine):
             self.play(tmpfile)
             os.remove(tmpfile)
 
+
 class AliyunTTS(AbstractTTSEngine):
     SLUG = "aliyun-tts"
 
@@ -369,13 +382,14 @@ class AliyunTTS(AbstractTTSEngine):
 
     def get_authorization(self, phrase, date):
         bodyMd5 = base64.b64encode(hashlib.md5(phrase).digest())
-        #md52 = base64.b64encode(hashlib.md5(bodyMd5).digest())
 
         method = "POST"
         accept = "audio/wav, application/json"
         content_type = "text/plain"
-        stringToSign = method + "\n" + accept + "\n" + bodyMd5 + "\n" + content_type + "\n" + date
-        signature = base64.b64encode(hmac.new(self.ak_secret, stringToSign, hashlib.sha1).digest())
+        stringToSign = method + "\n" + accept + "\n" +\
+            bodyMd5 + "\n" + content_type + "\n" + date
+        hmac_sha1 = hmac.new(self.ak_secret, stringToSign, hashlib.sha1)
+        signature = base64.b64encode(hmac_sha1.digest())
 
         authHeader = "Dataplus " + self.ak_id + ":" + signature
         return authHeader
@@ -385,15 +399,17 @@ class AliyunTTS(AbstractTTSEngine):
         return datetime.datetime.utcnow().strftime(GMT_FORMAT)
 
     def get_speech(self, phrase):
-        url = "http://nlsapi.aliyun.com/speak?encode_type=wav&voice_name=xiaoyun&volume=50"
+        url = "http://nlsapi.aliyun.com/speak?" + \
+              "encode_type=wav&voice_name=xiaoyun&volume=50"
         date = self.get_gmttime()
+        headers = {'Authorization': self.get_authorization(phrase, date),
+                   'Content-type': 'text/plain',
+                   'Accept': 'audio/wav, application/json',
+                   'Date': date,
+                   'Content-Length': str(len(phrase))}
         r = requests.post(url,
                           data=phrase,
-                          headers={'Authorization': self.get_authorization(phrase, date),
-                          'Content-type': 'text/plain',
-                          'Accept': 'audio/wav, application/json',
-                          'Date': date,
-                          'Content-Length': str(len(phrase))})
+                          headers=headers)
 
         try:
             r.raise_for_status()
@@ -418,6 +434,7 @@ class AliyunTTS(AbstractTTSEngine):
         if tmpfile is not None:
             self.play(tmpfile)
             os.remove(tmpfile)
+
 
 def get_default_engine_slug():
     return 'osx-tts' if platform.system().lower() == 'darwin' else 'ekho-tts'
@@ -460,6 +477,7 @@ def get_engines():
     return [tts_engine for tts_engine in
             list(get_subclasses(AbstractTTSEngine))
             if hasattr(tts_engine, 'SLUG') and tts_engine.SLUG]
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Jasper TTS module')
