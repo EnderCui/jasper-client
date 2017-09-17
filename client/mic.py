@@ -57,17 +57,21 @@ class Mic:
         # TODO: Consolidate variables from the next three functions
         THRESHOLD_MULTIPLIER = 1.8
         RATE = 16000
-        CHUNK = 1024
+        CHUNK = 1024 * 4
 
         # number of seconds to allow to establish threshold
         THRESHOLD_TIME = 1
 
         # prepare recording stream
-        stream = self._audio.open(format=pyaudio.paInt16,
-                                  channels=1,
-                                  rate=RATE,
-                                  input=True,
-                                  frames_per_buffer=CHUNK)
+        try:
+            stream = self._audio.open(format=pyaudio.paInt16,
+                                      channels=1,
+                                      rate=RATE,
+                                      input=True,
+                                   frames_per_buffer=CHUNK)
+        except Exception, e:
+            self._logger.error(e)
+            return None
 
         # stores the audio data
         frames = []
@@ -87,14 +91,14 @@ class Mic:
                 average = sum(lastN) / len(lastN)
 
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 continue
 
         try:
             stream.stop_stream()
             stream.close()
         except Exception, e:
-            self._logger.debug(e)
+            self._logger.error(e)
             pass
 
         # this will be the benchmark to cause a disturbance over!
@@ -110,7 +114,7 @@ class Mic:
 
         THRESHOLD_MULTIPLIER = 1.8
         RATE = 16000
-        CHUNK = 1024
+        CHUNK = 1024 * 4
 
         # number of seconds to allow to establish threshold
         THRESHOLD_TIME = 1
@@ -119,11 +123,15 @@ class Mic:
         LISTEN_TIME = 10
 
         # prepare recording stream
-        stream = self._audio.open(format=pyaudio.paInt16,
-                                  channels=1,
-                                  rate=RATE,
-                                  input=True,
-                                  frames_per_buffer=CHUNK)
+        try:
+            stream = self._audio.open(format=pyaudio.paInt16,
+                                      channels=1,
+                                      rate=RATE,
+                                      input=True,
+                                      frames_per_buffer=CHUNK)
+        except Exception, e:
+            self._logger.error(e)
+            return (None, None)
 
         # stores the audio data
         frames = []
@@ -136,9 +144,6 @@ class Mic:
         for i in range(0, RATE / CHUNK * THRESHOLD_TIME):
 
             try:
-                if self.stop_passive:
-                    break
-
                 data = stream.read(CHUNK)
                 frames.append(data)
 
@@ -156,16 +161,13 @@ class Mic:
                 # flag raised when sound disturbance detected
                 didDetect = False
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 pass
 
         # start passively listening for disturbance above threshold
         for i in range(0, RATE / CHUNK * LISTEN_TIME):
 
             try:
-                if self.stop_passive:
-                    break
-
                 data = stream.read(CHUNK)
                 frames.append(data)
                 score = self.getScore(data)
@@ -174,18 +176,17 @@ class Mic:
                     didDetect = True
                     break
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 continue
 
         # no use continuing if no flag raised
         if not didDetect:
             print "No disturbance detected"
             try:
-                self.stop_passive = False
                 stream.stop_stream()
                 stream.close()
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 pass
             return (None, None)
 
@@ -197,21 +198,18 @@ class Mic:
         DELAY_MULTIPLIER = 1
         for i in range(0, RATE / CHUNK * DELAY_MULTIPLIER):
             try:
-                if self.stop_passive:
-                    break
                 data = stream.read(CHUNK)
                 frames.append(data)
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 continue
 
         # save the audio data
         try:
-            self.stop_passive = False
             stream.stop_stream()
             stream.close()
         except Exception, e:
-            self._logger.debug(e)
+            self._logger.error(e)
             pass
 
         with tempfile.NamedTemporaryFile(mode='w+b') as f:
@@ -251,19 +249,24 @@ class Mic:
         """
 
         RATE = 16000
-        CHUNK = 1024
-        LISTEN_TIME = 12
+        CHUNK = 1024 * 4
+        LISTEN_TIME = 5
 
         # check if no threshold provided
         if THRESHOLD is None:
             THRESHOLD = self.fetchThreshold()
 
         # prepare recording stream
-        stream = self._audio.open(format=pyaudio.paInt16,
-                                  channels=1,
-                                  rate=RATE,
-                                  input=True,
-                                  frames_per_buffer=CHUNK)
+        try:
+            stream = self._audio.open(format=pyaudio.paInt16,
+                                      channels=1,
+                                      rate=RATE,
+                                      input=True,
+                                      frames_per_buffer=CHUNK)
+        except Exception, e:
+            self._logger.error(e)
+            return None
+
         self.speaker.play(jasperpath.data('audio', 'beep_hi.wav'))
 
         frames = []
@@ -283,10 +286,10 @@ class Mic:
                 average = sum(lastN) / float(len(lastN))
 
                 # TODO: 0.8 should not be a MAGIC NUMBER!
-                if average < THRESHOLD * 0.8:
+                if average < THRESHOLD * 0.9:
                     break
             except Exception, e:
-                self._logger.debug(e)
+                self._logger.error(e)
                 continue
 
         self.speaker.play(jasperpath.data('audio', 'beep_lo.wav'))
