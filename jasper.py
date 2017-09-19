@@ -6,6 +6,7 @@ import sys
 import logging
 import yaml
 import argparse
+import subprocess
 
 from client import tts
 from client import stt
@@ -90,7 +91,29 @@ class Jasper(object):
                        stt_passive_engine_class.get_passive_instance(),
                        stt_engine_class.get_active_instance())
 
+    def kill_legacy_process(self):
+        grep_cmd = "ps aux | grep 'python jasper.py' | grep -v grep"
+        try:
+            p = subprocess.Popen(
+                grep_cmd,
+                stdout=subprocess.PIPE, shell=True)
+            p.wait()
+            lines = p.stdout.readlines()
+
+            for line in lines:
+                if str(os.getpid()) == line.split()[1]:
+                    continue
+                kill_cmd = "kill -9 " + line.split()[1]
+
+                p = subprocess.Popen(
+                    kill_cmd,
+                    stdout=subprocess.PIPE, shell=True)
+                p.wait()
+        except:
+            pass
+
     def run(self):
+        self.kill_legacy_process()
         if 'first_name' in self.config:
             salutation = ("How can I be of service, %s?"
                           % self.config["first_name"])
