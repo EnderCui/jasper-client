@@ -119,14 +119,14 @@ class Jasper(object):
                           % self.config["first_name"])
         else:
             salutation = "How can I be of service?"
-        self.mic.say(salutation)
+        #self.mic.say(salutation)
 
         if 'slackbot' in self.config:
             if 'slackbot_webhook_url' in self.config["slackbot"]:
                 bot = Slackbot(self.config["slackbot"]["slackbot_webhook_url"])
             else:
                 bot = Slackbot()
-        bot.startBot()
+        #bot.startBot()
 
         if 'robot_name' in self.config:
             persona = self.config["robot_name"]
